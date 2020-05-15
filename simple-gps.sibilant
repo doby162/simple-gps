@@ -1,0 +1,103 @@
+(def name-to-task
+  (task-data name)
+  (first (task-data.filter (lambda (item) (= name (get item "task"))))))
+
+(def member?
+  (element collection)
+  (not (= -1 (collection.indexOf element))))
+
+(def find-steps
+  (task-data goals solution)
+  (var remaining-goals (goals.filter (lambda (item) (not (member? (get item "task") solution)))))
+  (var current-goal (last remaining-goals))
+  (var current-goal-null (= (typeof current-goal) "undefined"))
+  (var depends 0) ; default value due to null handling in Sibilant
+  (when (not current-goal-null) (assign depends (get current-goal "depends")))
+  (if
+    current-goal-null
+    ; check if we are out of goals, terminating this branch
+    solution
+    (or
+      (depends.every (lambda (item) (member? item solution)))
+      (empty? depends))
+    ; check if we can do the current goal action
+    (find-steps task-data goals (solution.concat (get current-goal "task")))
+    ; recurse deeper looking for a goal we can accomplish
+    (find-steps task-data (goals.concat (depends.map (lambda (item) (name-to-task task-data item)))) solution)))
+
+(def determine-order (task-data goals)
+  (find-steps task-data (goals.map (lambda (item) (name-to-task task-data item))) [] 0))
+
+;; included tests
+(var example-tasks
+     [{task "make a sandwich", depends ["buy groceries"]}
+      {task "buy groceries", depends ["go to the store"]}
+      {task "go to the store", depends []}])
+
+;; The following should print:
+;; [ 'go to the store', 'buy groceries', 'make a sandwich' ]
+(console.log (determine-order example-tasks ["make a sandwich"]))
+
+;; The following should also print:
+;; [ 'go to the store', 'buy groceries', 'make a sandwich' ]
+(console.log (determine-order example-tasks ["buy groceries" "make a sandwich"]))
+
+;; test a shorter sequence
+;; The following should also print:
+;;  [ 'go to the store', 'buy groceries' ]
+(console.log (determine-order example-tasks ["buy groceries"]))
+
+;; Test multiple depends on nodes
+(var example-tasks2
+  [{task "make a sandwich" depends ["wash hands" "buy groceries"]}
+   {task "buy groceries" depends ["go to the store"]}
+   {task "go to the store" depends []}
+   {task "wash hands" depends ["turn on sink" "get soap"]}
+   {task "turn on sink" depends []}
+   {task "get soap" depends ["go to the store"]}])
+
+;; The following should also print:
+;;  [ 'go to the store',
+;;    'buy groceries',
+;;    'get soap',
+;;    'turn on sink',
+;;    'wash hands',
+;;    'make a sandwich' ]
+(console.log (determine-order example-tasks2 ["make a sandwich"]))
+
+;; less interesting tests below
+
+(var example-tasks3
+  [{task "l" depends ["m"]}
+   {task "m" depends ["n"]}
+   {task "n" depends ["o"]}
+   {task "o" depends ["p"]}
+   {task "p" depends ["q"]}
+   {task "q" depends ["r"]}
+   {task "r" depends ["x"]}
+   {task "x" depends ["t"]}
+   {task "t" depends ["u"]}
+   {task "u" depends ["v"]}
+   {task "v" depends []}])
+
+;; test a longer simple chain
+; ["v" "u" "t" "x" "r" "q" "p" "o" "n" "m" "l"]
+(console.log (determine-order example-tasks3 ["l"]))
+
+; ["v"]
+(console.log (determine-order example-tasks3 ["v"]))
+
+; ["v" "u" "t" "x"]
+(console.log (determine-order example-tasks3 ["x"]))
+
+;; these tests quite reasonably error when run
+;(var example-tasks4
+;  [{task "impossible task" depends "can't be done"}])
+; []
+;(console.log (determine-order example-tasks4 ["impossible task"]))
+
+;(var circular-tasks
+;  [{task "task a" depends "task b"}
+;   {task "task b" depends "task a"}])
+; []
+;(console.log (determine-order circular-tasks ["task a"]))
